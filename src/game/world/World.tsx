@@ -1,0 +1,207 @@
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { LOCATION } from "../content";
+import { useGame } from "../store";
+import { audio } from "../audio";
+import type { Interactable } from "../types";
+import { Player } from "./Player";
+import { LocationSet } from "./Sets";
+
+function FogRig({ color, near, far }: { color: string; near: number; far: number }) {
+  useFrame(({ scene }) => {
+    scene.fog = scene.fog ?? new THREE.Fog(color, near, far);
+    const f = scene.fog as THREE.Fog;
+    f.color.set(color);
+    f.near = near;
+    f.far = far;
+  });
+  return null;
+}
+
+function Threat() {
+  const loc = useGame((s) => s.locationId);
+  const flags = useGame((s) => s.flags);
+  const ammo = useGame((s) => s.ammo);
+  const timer = useRef(0);
+  const staggered = useRef(0);
+  useFrame((_, dt) => {
+    if (loc !== "tunnel" && loc !== "cavern" && loc !== "maw") return;
+    const st = useGame.getState();
+    const p = window.__controlsTest?.getPosition?.();
+    if (!p) return;
+    if (staggered.current > 0) staggered.current -= dt;
+    const cult = loc === "tunnel" ? ([1.0, -8] as const) : loc === "maw" ? ([0, -10] as const) : ([0, -12] as const);
+    const d = Math.hypot(p[0] - cult[0], p[2] - cult[1]);
+    if (flags.cultistSeen || loc !== "tunnel") {
+      if (d < 3.2 && staggered.current <= 0) {
+        timer.current += dt;
+        if (Math.random() < dt * 0.4) audio.cough(0.7);
+        if (timer.current > 2.8) {
+          timer.current = 0;
+          st.die();
+        }
+      } else timer.current = Math.max(0, timer.current - dt);
+    }
+    const sailor = Math.hypot(p[0] + 1.1, p[2] + 2);
+    if (loc === "tunnel" && sailor < 1.6 && staggered.current <= 0 && flags.cultistSeen) {
+      if (Math.random() < dt * 0.25) audio.groan();
+    }
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "KeyR" && e.code !== "Space") return;
+      const st = useGame.getState();
+      if (st.overlay || st.screen !== "play") return;
+      if (e.code === "KeyR" || e.code === "Space") {
+        if (st.ammo > 0) {
+          st.fire();
+          staggered.current = 1.1 + st.strength * 0.12;
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ammo, flags]);
+  return null;
+}
+
+function CoughBed() {
+  useFrame(() => {
+    const st = useGame.getState();
+    if (st.screen !== "play") return;
+    if (Math.random() < 0.003 + st.decay * 0.01) audio.cough(0.25 + st.decay * 0.5);
+    st.tickDecay(1 / 60);
+  });
+  return null;
+}
+
+function Scene() {
+  const id = useGame((s) => s.locationId);
+  const loc = LOCATION[id];
+  const setPrompt = useGame((s) => s.setPrompt);
+  const [focus, setFocus] = useState<Interactable | null>(null);
+
+  useEffect(() => {
+    setPrompt(focus ? `${focus.label}` : null);
+  }, [focus, setPrompt]);
+
+  if (!loc) return null;
+
+  const onUse = (it: Interactable) => {
+    const st = useGame.getState();
+    if (it.requireFlag && !st.flags[it.requireFlag]) return;
+    if (it.kind === "exit" && it.exitTo) {
+      st.setLocation(it.exitTo);
+      return;
+    }
+    if (it.kind === "person" && it.options) {
+      const avail = it.options.filter((o) => {
+        if (o.requireCoat && st.coat !== o.requireCoat) return false;
+        if (o.requireClue && !st.clues[o.requireClue]) return false;
+        if (o.requireFlag && !st.flags[o.requireFlag]) return false;
+        if (o.hideIf && st.clues[o.hideIf]) return false;
+        return true;
+      });
+      if (!avail.length) {
+        st.consult([{ text: "NOTHING FURTHER." }]);
+        return;
+      }
+      if (avail.length === 1) {
+        const r = avail[0].result;
+        st.consult(r.lines, {
+          clueId: r.clueId,
+          perception: r.perception,
+          flag: r.flag,
+          item: r.item,
+          unlock: r.unlock,
+        });
+        return;
+      }
+      st.openChoices(it.label, avail);
+      return;
+    }
+    if (it.id === "spill") {
+      st.spillFlask();
+      st.shatter();
+    }
+    if (it.id === "file-eight") st.fileEight();
+    if (it.id === "triplicate") st.fileTriplicate();
+    if (it.id === "board") {
+      st.openBoard();
+      if (st.spine) {
+        setTimeout(() => st.die(), 1600);
+      }
+      return;
+    }
+    if (it.id === "file-table") {
+      st.openFile();
+      return;
+    }
+    if (it.id === "dead-ahead") {
+      st.examine(it.id, it.title ?? it.label, it.body ?? "", {
+        clueId: it.clueId,
+        perception: it.perception,
+        item: it.item,
+        flag: it.flag,
+      });
+      setTimeout(() => st.die(), 2200);
+      return;
+    }
+    if (it.id === "final") {
+      st.setFlag("finalReady");
+      st.openInventory();
+      return;
+    }
+    if (it.kind === "pickup" && it.item && st.chapter === 2) {
+      st.collectPack(it.item, false, it.body ?? it.title ?? it.label);
+      st.examine(it.id, it.title ?? it.label, (it.body ?? "") + " Logged in the Codex. Carried, if the pack would take it.", {
+        clueId: it.clueId,
+        perception: it.perception,
+        item: it.item,
+        flag: it.flag,
+      });
+      return;
+    }
+    st.examine(it.id, it.title ?? it.label, it.body ?? "", {
+      clueId: it.clueId,
+      perception: it.perception,
+      item: it.item,
+      flag: it.flag,
+    });
+  };
+
+  return (
+    <>
+      <color attach="background" args={[loc.fog]} />
+      <FogRig color={loc.fog} near={loc.fogNear} far={loc.fogFar} />
+      <ambientLight intensity={0.18} color={loc.ambient} />
+      <hemisphereLight args={["#3a342c", "#0a0908", 0.35]} />
+      <LocationSet loc={loc} />
+      <Player location={loc} onFocus={setFocus} onUse={onUse} />
+      <Threat />
+      <CoughBed />
+    </>
+  );
+}
+
+export function World() {
+  return (
+    <Canvas
+      className="game-canvas"
+      dpr={[1, 1.6]}
+      shadows={false}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+      camera={{ fov: 64, near: 0.08, far: 90, position: [0, 1.7, 16] }}
+      onCreated={({ gl }) => {
+        gl.setClearColor("#0a0908");
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 0.92;
+      }}
+    >
+      <Suspense fallback={null}>
+        <Scene />
+      </Suspense>
+    </Canvas>
+  );
+}

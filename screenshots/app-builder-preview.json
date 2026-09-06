@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Three Colors of Madness",
+      "hasCanvas": false,
+      "bodyTextLen": 157,
+      "bodyTextHash": "a8536c01156e0daa63a3355a8de97dae312d728e1323ea3d2781ec6c4d28fe4a",
+      "bodyTextPrefix": "WIDOW'S BIGHT Three Colors of Madness Competence delays the end.",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Three Colors of Madness",
+      "hasCanvas": false,
+      "bodyTextLen": 157,
+      "bodyTextHash": "a8536c01156e0daa63a3355a8de97dae312d728e1323ea3d2781ec6c4d28fe4a",
+      "bodyTextPrefix": "WIDOW'S BIGHT Three Colors of Madness Competence delays the end.",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
