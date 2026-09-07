@@ -8,35 +8,37 @@ import type { Interactable } from "../types";
 import { Player } from "./Player";
 import { LocationSet } from "./Sets";
 
-/** Lift near-black location fog into a readable silver-nitrate grey. */
+/** Silver-nitrate grey — never black. Fog is atmosphere, not a mask. */
 function filmFog(hex: string) {
   const c = new THREE.Color(hex);
   const hsl = { h: 0, s: 0, l: 0 };
   c.getHSL(hsl);
-  const l = Math.min(0.48, Math.max(0.28, hsl.l * 2.8 + 0.22));
-  return new THREE.Color().setHSL(0.08, 0.02, l);
+  const l = Math.min(0.58, Math.max(0.48, hsl.l * 1.35 + 0.38));
+  return new THREE.Color().setHSL(0.08, 0.015, l);
 }
 
 function FogRig({ color, near, far }: { color: string; near: number; far: number }) {
   const grey = filmFog(color);
-  useFrame(({ scene }) => {
+  useFrame(({ scene, gl }) => {
     scene.fog = scene.fog ?? new THREE.Fog(grey, near, far);
     const f = scene.fog as THREE.Fog;
     f.color.copy(grey);
-    f.near = near;
-    f.far = Math.max(far, near + 18);
+    f.near = Math.max(near, 28);
+    f.far = Math.max(far, 96);
     scene.background = grey;
+    gl.setClearColor(grey, 1);
+    gl.toneMapping = THREE.NoToneMapping;
   });
   return null;
 }
 
-function CamFill() {
-  const ref = useRef<THREE.PointLight>(null);
-  useFrame(({ camera }) => {
-    if (!ref.current) return;
-    ref.current.position.copy(camera.position);
-  });
-  return <pointLight ref={ref} color="#f2f2f0" intensity={55} distance={14} decay={2} />;
+function SkyDome({ color }: { color: THREE.Color }) {
+  return (
+    <mesh>
+      <sphereGeometry args={[70, 16, 12]} />
+      <meshBasicMaterial color={color} side={THREE.BackSide} fog={false} depthWrite={false} />
+    </mesh>
+  );
 }
 
 function Threat() {
@@ -100,7 +102,7 @@ function GreyFallback() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
       <planeGeometry args={[80, 80]} />
-      <meshBasicMaterial color="#6a6a6a" />
+      <meshBasicMaterial color="#9a9a96" />
     </mesh>
   );
 }
@@ -206,11 +208,7 @@ function Scene() {
     <>
       <color attach="background" args={[`#${fog.getHexString()}`]} />
       <FogRig color={loc.fog} near={loc.fogNear} far={loc.fogFar} />
-      <ambientLight intensity={1.25} color="#e4e4e0" />
-      <hemisphereLight args={["#f2f2ee", "#5a5a56", 1.35]} />
-      <directionalLight position={[8, 18, 10]} intensity={3.2} color="#f7f7f4" />
-      <directionalLight position={[-6, 8, -4]} intensity={0.9} color="#d0d0cc" />
-      <CamFill />
+      <SkyDome color={fog} />
       <Suspense fallback={<GreyFallback />}>
         <LocationSet loc={loc} />
       </Suspense>
@@ -225,14 +223,16 @@ export function World() {
   return (
     <Canvas
       className="game-canvas"
-      dpr={[1, 1.6]}
+      flat
+      linear={false}
+      dpr={[1, 1.5]}
       shadows={false}
-      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping }}
       camera={{ fov: 64, near: 0.08, far: 90, position: [0, 1.7, 16] }}
       onCreated={({ gl }) => {
-        gl.setClearColor("#7a7a76");
-        gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.7;
+        gl.setClearColor("#b8b8b4", 1);
+        gl.toneMapping = THREE.NoToneMapping;
+        gl.toneMappingExposure = 1;
         gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
     >

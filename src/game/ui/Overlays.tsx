@@ -8,11 +8,7 @@ function FilmGrain({ reduce }: { reduce: boolean }) {
 }
 
 function Iris() {
-  const screen = useGame((s) => s.screen);
-  const loc = useGame((s) => s.locationId);
-  const kind = LOCATION[loc]?.iris ?? "square";
-  if (screen !== "play") return null;
-  return <div className="iris-layer" data-kind={kind} aria-hidden />;
+  return null;
 }
 
 function Distortion() {
