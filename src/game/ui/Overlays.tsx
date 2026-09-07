@@ -8,25 +8,11 @@ function FilmGrain({ reduce }: { reduce: boolean }) {
 }
 
 function Iris() {
-  const iris = useGame((s) => s.iris);
   const screen = useGame((s) => s.screen);
   const loc = useGame((s) => s.locationId);
   const kind = LOCATION[loc]?.iris ?? "square";
   if (screen !== "play") return null;
-  const size = Math.min(140, Math.max(28, iris * 118));
-  const round = kind === "square" ? 0 : kind === "burn" ? 50 : 8;
-  return (
-    <div className="iris-layer" aria-hidden>
-      <div
-        className="iris-hole"
-        style={{
-          width: `${size}vmin`,
-          height: `${size}vmin`,
-          borderRadius: round,
-        }}
-      />
-    </div>
-  );
+  return <div className="iris-layer" data-kind={kind} aria-hidden />;
 }
 
 function Distortion() {
@@ -52,7 +38,9 @@ function Distortion() {
 
 function TitleScreen() {
   const setScreen = useGame((s) => s.setScreen);
+  const wipeSave = useGame((s) => s.wipeSave);
   const saved = hasSave();
+  const [confirmWipe, setConfirmWipe] = useState(false);
   return (
     <section className="panel title-panel" data-pf="title">
       <img src="/game/club-night.jpg" alt="" className="bg-still" />
@@ -70,6 +58,22 @@ function TitleScreen() {
           {saved && (
             <button type="button" className="btn-ghost" onClick={() => useGame.getState().continueGame()}>
               Continue
+            </button>
+          )}
+          {saved && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                if (!confirmWipe) {
+                  setConfirmWipe(true);
+                  return;
+                }
+                wipeSave();
+                setConfirmWipe(false);
+              }}
+            >
+              {confirmWipe ? "Confirm — wipe the file" : "Abandon the file"}
             </button>
           )}
         </div>
@@ -256,6 +260,13 @@ function PlayHud() {
           {loc?.name}
           {chapter === 1 ? ` · ${coat === "uniform" ? "Badge" : "Plain coat"}` : ""}
         </p>
+        <button
+          type="button"
+          className="hud-pause"
+          onClick={() => useGame.getState().setScreen("pause")}
+        >
+          Menu
+        </button>
       </div>
       <div className="crosshair" aria-hidden />
       {prompt && (
@@ -266,7 +277,7 @@ function PlayHud() {
       )}
       <p className="hud-hint">
         {hint ? "Click and drag to look. " : ""}
-        WASD move · E examine · Tab file · I kit · {chapter === 1 ? "F flask · C coat" : chapter === 2 ? "F opium · Space jump" : "F match · R fire"}
+        WASD move · E examine · Esc menu · Tab file · I kit · {chapter === 1 ? "F flask · C coat" : chapter === 2 ? "F opium · Space jump" : "F match · R fire"}
       </p>
     </div>
   );
@@ -499,11 +510,11 @@ function EndingScreen() {
         <h2 className="display">{copy.title}</h2>
         <p className="lede">{copy.body}</p>
         <div className="stack">
-          <button type="button" className="btn-primary" onClick={() => setScreen("archive")}>
-            The archive
+          <button type="button" className="btn-primary" onClick={() => setScreen("chapters")}>
+            Begin again
           </button>
-          <button type="button" className="btn-ghost" onClick={() => setScreen("chapters")}>
-            Chapters
+          <button type="button" className="btn-ghost" onClick={() => setScreen("archive")}>
+            The archive
           </button>
         </div>
       </div>
@@ -577,6 +588,10 @@ function ArchiveScreen() {
 function PauseScreen() {
   const setScreen = useGame((s) => s.setScreen);
   const persist = useGame((s) => s.persist);
+  const chapter = useGame((s) => s.chapter);
+  const newGame = useGame((s) => s.newGame);
+  const wipeSave = useGame((s) => s.wipeSave);
+  const [confirmWipe, setConfirmWipe] = useState(false);
   return (
     <section className="panel dark-panel" data-pf="pause">
       <div className="sheet dark">
@@ -592,11 +607,27 @@ function PauseScreen() {
           >
             Resume
           </button>
-          <button type="button" className="btn-ghost" onClick={() => setScreen("accessibility")}>
-            Access
+          <button type="button" className="btn-ghost" onClick={() => newGame(chapter)}>
+            Restart this chapter
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setScreen("chapters")}>
+            New investigation
           </button>
           <button type="button" className="btn-ghost" onClick={() => setScreen("title")}>
             Title
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              if (!confirmWipe) {
+                setConfirmWipe(true);
+                return;
+              }
+              wipeSave();
+            }}
+          >
+            {confirmWipe ? "Confirm — wipe the file" : "Abandon the file"}
           </button>
         </div>
       </div>
@@ -655,6 +686,11 @@ export function Overlays() {
       if (e.code === "Escape" && st.overlay) {
         e.preventDefault();
         st.closeOverlay();
+        return;
+      }
+      if (e.code === "Escape" && st.screen === "pause") {
+        e.preventDefault();
+        st.setScreen("play");
         return;
       }
       if (!st.overlay) return;

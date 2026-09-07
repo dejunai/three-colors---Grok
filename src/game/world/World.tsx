@@ -8,15 +8,35 @@ import type { Interactable } from "../types";
 import { Player } from "./Player";
 import { LocationSet } from "./Sets";
 
+/** Lift near-black location fog into a readable silver-nitrate grey. */
+function filmFog(hex: string) {
+  const c = new THREE.Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  const l = Math.min(0.48, Math.max(0.28, hsl.l * 2.8 + 0.22));
+  return new THREE.Color().setHSL(0.08, 0.02, l);
+}
+
 function FogRig({ color, near, far }: { color: string; near: number; far: number }) {
+  const grey = filmFog(color);
   useFrame(({ scene }) => {
-    scene.fog = scene.fog ?? new THREE.Fog(color, near, far);
+    scene.fog = scene.fog ?? new THREE.Fog(grey, near, far);
     const f = scene.fog as THREE.Fog;
-    f.color.set(color);
+    f.color.copy(grey);
     f.near = near;
-    f.far = far;
+    f.far = Math.max(far, near + 18);
+    scene.background = grey;
   });
   return null;
+}
+
+function CamFill() {
+  const ref = useRef<THREE.PointLight>(null);
+  useFrame(({ camera }) => {
+    if (!ref.current) return;
+    ref.current.position.copy(camera.position);
+  });
+  return <pointLight ref={ref} color="#f2f2f0" intensity={55} distance={14} decay={2} />;
 }
 
 function Threat() {
@@ -74,6 +94,15 @@ function CoughBed() {
     st.tickDecay(1 / 60);
   });
   return null;
+}
+
+function GreyFallback() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <planeGeometry args={[80, 80]} />
+      <meshBasicMaterial color="#6a6a6a" />
+    </mesh>
+  );
 }
 
 function Scene() {
@@ -171,13 +200,20 @@ function Scene() {
     });
   };
 
+  const fog = filmFog(loc.fog);
+
   return (
     <>
-      <color attach="background" args={[loc.fog]} />
+      <color attach="background" args={[`#${fog.getHexString()}`]} />
       <FogRig color={loc.fog} near={loc.fogNear} far={loc.fogFar} />
-      <ambientLight intensity={0.18} color={loc.ambient} />
-      <hemisphereLight args={["#3a342c", "#0a0908", 0.35]} />
-      <LocationSet loc={loc} />
+      <ambientLight intensity={1.25} color="#e4e4e0" />
+      <hemisphereLight args={["#f2f2ee", "#5a5a56", 1.35]} />
+      <directionalLight position={[8, 18, 10]} intensity={3.2} color="#f7f7f4" />
+      <directionalLight position={[-6, 8, -4]} intensity={0.9} color="#d0d0cc" />
+      <CamFill />
+      <Suspense fallback={<GreyFallback />}>
+        <LocationSet loc={loc} />
+      </Suspense>
       <Player location={loc} onFocus={setFocus} onUse={onUse} />
       <Threat />
       <CoughBed />
@@ -194,12 +230,13 @@ export function World() {
       gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       camera={{ fov: 64, near: 0.08, far: 90, position: [0, 1.7, 16] }}
       onCreated={({ gl }) => {
-        gl.setClearColor("#0a0908");
+        gl.setClearColor("#7a7a76");
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 0.92;
+        gl.toneMappingExposure = 1.7;
+        gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
     >
-      <Suspense fallback={null}>
+      <Suspense fallback={<GreyFallback />}>
         <Scene />
       </Suspense>
     </Canvas>
