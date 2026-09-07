@@ -51,6 +51,8 @@ type GameStore = {
   locked: boolean;
   glitch: number;
   lookHint: boolean;
+  nearby: { id: string; label: string }[];
+  focusId: string | null;
 
   hydrate: () => void;
   persist: () => void;
@@ -88,6 +90,7 @@ type GameStore = {
   collectPack: (id: ItemId, documentOnly: boolean, note: string) => void;
   difficultyGlitch: () => void;
   setPrompt: (t: string | null) => void;
+  setNearby: (nearby: { id: string; label: string }[], focusId: string | null) => void;
   setLocked: (v: boolean) => void;
   openChoices: (title: string, options: ConsultOption[]) => void;
   pickChoice: (id: string) => void;
@@ -211,6 +214,8 @@ export const useGame = create<GameStore>((set, get) => ({
   locked: false,
   glitch: 0,
   lookHint: true,
+  nearby: [],
+  focusId: null,
 
   hydrate: () => {
     const d = readSave();
@@ -482,6 +487,7 @@ export const useGame = create<GameStore>((set, get) => ({
     }, 280);
   },
   setPrompt: (t) => set({ prompt: t }),
+  setNearby: (nearby, focusId) => set({ nearby, focusId }),
   setLocked: (v) => set({ locked: v }),
   openChoices: (title, options) => set({ overlay: { kind: "choices", title, options } }),
   pickChoice: (id) => {

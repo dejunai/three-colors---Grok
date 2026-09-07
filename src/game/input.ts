@@ -1,5 +1,10 @@
 /** Device layer → abstract actions. Gameplay reads only actions. */
 
+import { actOn, findSubject, visibleSubjects } from "./act";
+import { LOCATION } from "./content";
+import { seek } from "./seek";
+import { useGame } from "./store";
+
 export type Actions = {
   moveX: number;
   moveY: number;
@@ -99,6 +104,14 @@ export type GameInputHook = {
   /** Add look delta in the same units as pointer movement. */
   look: (dx: number, dy: number) => void;
   interact: () => void;
+  /** Walk to a subject by id; examines on arrival when `use` is true (default). */
+  walkTo: (id: string, opts?: { use?: boolean }) => void;
+  /** Examine a subject, walking into range first if needed. Omit id to use whatever is focused. */
+  use: (id?: string) => void;
+  /** Face a subject. */
+  lookAt: (id: string) => void;
+  /** Snapshot of the 3D scene for QA (location, pose, nearby subjects, overlay). */
+  getWorld: () => WorldSnapshot;
   openFile: () => void;
   openInventory: () => void;
   flask: () => void;
@@ -111,6 +124,20 @@ export type GameInputHook = {
   /** Hold these codes until the next setKeys / clear. */
   setKeys: (codes: string[]) => void;
   clear: () => void;
+};
+
+export type WorldSnapshot = {
+  screen: string;
+  locationId: string;
+  locationName: string;
+  overlay: string | null;
+  prompt: string | null;
+  focusId: string | null;
+  position: [number, number, number];
+  yaw: number;
+  speed: number;
+  nearby: { id: string; label: string }[];
+  subjects: { id: string; label: string; kind: string; pos: [number, number, number] }[];
 };
 
 const listenOpts: AddEventListenerOptions = { capture: true };
@@ -129,37 +156,38 @@ class Input {
   private edges: Actions = empty();
   private bound = false;
   pointerDown = false;
-  /** Failed pointer-lock (iframe / WrongDocumentError) must not wipe held WASD. */
-  private suppressBlurClear = false;
   private moveTimer: ReturnType<typeof setTimeout> | null = null;
+  private keyTarget: HTMLElement | null = null;
 
   bind() {
     if (this.bound) return;
     this.bound = true;
-    window.addEventListener("keydown", this.onKeyDown, listenOpts);
-    window.addEventListener("keyup", this.onKeyUp, listenOpts);
-    window.addEventListener("blur", this.onBlur);
+    const opts = listenOpts;
+    window.addEventListener("keydown", this.onKeyDown, opts);
+    window.addEventListener("keyup", this.onKeyUp, opts);
+    document.addEventListener("keydown", this.onKeyDown, opts);
+    document.addEventListener("keyup", this.onKeyUp, opts);
     document.addEventListener("visibilitychange", this.onVis);
     window.addEventListener("pointermove", this.onMove);
     window.addEventListener("pointerup", this.onUp);
     window.addEventListener("pointercancel", this.onUp);
     window.addEventListener("contextmenu", this.onMenu);
-    document.addEventListener("pointerlockerror", this.onLockError);
     this.installHook();
   }
 
   unbind() {
     if (!this.bound) return;
     this.bound = false;
-    window.removeEventListener("keydown", this.onKeyDown, listenOpts);
-    window.removeEventListener("keyup", this.onKeyUp, listenOpts);
-    window.removeEventListener("blur", this.onBlur);
+    const opts = listenOpts;
+    window.removeEventListener("keydown", this.onKeyDown, opts);
+    window.removeEventListener("keyup", this.onKeyUp, opts);
+    document.removeEventListener("keydown", this.onKeyDown, opts);
+    document.removeEventListener("keyup", this.onKeyUp, opts);
     document.removeEventListener("visibilitychange", this.onVis);
     window.removeEventListener("pointermove", this.onMove);
     window.removeEventListener("pointerup", this.onUp);
     window.removeEventListener("pointercancel", this.onUp);
     window.removeEventListener("contextmenu", this.onMenu);
-    document.removeEventListener("pointerlockerror", this.onLockError);
     this.clear();
   }
 
@@ -171,7 +199,11 @@ class Input {
         this.lookX += dx;
         this.lookY += dy;
       },
-      interact: () => this.tap("KeyE"),
+      interact: () => this.use(),
+      walkTo: (id, opts) => this.walkTo(id, opts),
+      use: (id) => this.use(id),
+      lookAt: (id) => this.lookAt(id),
+      getWorld: () => this.getWorld(),
       openFile: () => this.tap("Tab"),
       openInventory: () => this.tap("KeyI"),
       flask: () => this.tap("KeyF"),
@@ -186,10 +218,74 @@ class Input {
       setKeys: (codes) => this.setKeys(codes),
       clear: () => this.clear(),
     };
+    window.__game = window.__gameInput;
   }
 
   tap(code: string) {
     this.pulses.add(code);
+  }
+
+  walkTo(id: string, opts: { use?: boolean } = {}) {
+    const it = findSubject(id);
+    if (!it) return;
+    const use = opts.use !== false;
+    const p = window.__controlsTest?.getPosition?.();
+    const dist = p ? Math.hypot(p[0] - it.pos[0], p[2] - it.pos[2]) : 999;
+    const reach = (it.radius ?? 2.2) + 0.8;
+    if (dist <= reach) {
+      if (use) actOn(it);
+      return;
+    }
+    seek.set({ x: it.pos[0], z: it.pos[2], id: it.id, use });
+  }
+
+  use(id?: string) {
+    if (!id) {
+      const focus = useGame.getState().focusId;
+      if (focus) {
+        const it = findSubject(focus);
+        if (it) {
+          actOn(it);
+          return;
+        }
+      }
+      this.tap("KeyE");
+      return;
+    }
+    this.walkTo(id, { use: true });
+  }
+
+  lookAt(id: string) {
+    const it = findSubject(id);
+    if (!it) return;
+    const p = window.__controlsTest?.getPosition?.();
+    if (!p) return;
+    const yaw = Math.atan2(-(it.pos[0] - p[0]), -(it.pos[2] - p[2]));
+    window.__controlsTest?.setYaw?.(yaw);
+  }
+
+  getWorld(): WorldSnapshot {
+    const st = useGame.getState();
+    const loc = LOCATION[st.locationId];
+    const pos = window.__controlsTest?.getPosition?.() ?? loc?.spawn ?? [0, 1.7, 0];
+    return {
+      screen: st.screen,
+      locationId: st.locationId,
+      locationName: loc?.name ?? "",
+      overlay: st.overlay ? st.overlay.kind : null,
+      prompt: st.prompt,
+      focusId: st.focusId,
+      position: [pos[0], pos[1], pos[2]],
+      yaw: window.__controlsTest?.getYaw?.() ?? 0,
+      speed: window.__controlsTest?.getSpeed?.() ?? 0,
+      nearby: st.nearby,
+      subjects: visibleSubjects().map((it) => ({
+        id: it.id,
+        label: it.label,
+        kind: it.kind,
+        pos: it.pos,
+      })),
+    };
   }
 
   move(x: number, y: number, ms = 400) {
@@ -203,16 +299,20 @@ class Input {
     }, Math.max(0, ms));
   }
 
-  /** Next window blur (failed pointer lock) must not drop held movement keys. */
-  ignoreNextBlur() {
-    this.suppressBlurClear = true;
+  attachTarget(el: HTMLElement | null) {
+    if (this.keyTarget === el) return;
+    if (this.keyTarget) {
+      this.keyTarget.removeEventListener("keydown", this.onKeyDown, listenOpts);
+      this.keyTarget.removeEventListener("keyup", this.onKeyUp, listenOpts);
+    }
+    this.keyTarget = el;
+    if (el) {
+      el.addEventListener("keydown", this.onKeyDown, listenOpts);
+      el.addEventListener("keyup", this.onKeyUp, listenOpts);
+    }
   }
 
   private onMenu = (e: Event) => e.preventDefault();
-
-  private onLockError = () => {
-    this.suppressBlurClear = true;
-  };
 
   private onKeyDown = (e: KeyboardEvent) => {
     const code = resolveKeyCode(e);
@@ -231,18 +331,8 @@ class Input {
     if (document.hidden) this.clear();
   };
 
-  private onBlur = () => {
-    if (this.suppressBlurClear) {
-      this.suppressBlurClear = false;
-      this.pointerDown = false;
-      return;
-    }
-    this.clear();
-  };
-
   private onMove = (e: PointerEvent) => {
-    const locked = Boolean(document.pointerLockElement);
-    if (!locked && !this.pointerDown) return;
+    if (!this.pointerDown) return;
     this.lookX += e.movementX;
     this.lookY += e.movementY;
   };
@@ -347,10 +437,14 @@ class Input {
 
 export const input = new Input();
 
-if (typeof window !== "undefined") input.installHook();
+if (typeof window !== "undefined") {
+  input.installHook();
+  input.bind();
+}
 
 declare global {
   interface Window {
     __gameInput?: GameInputHook;
+    __game?: GameInputHook;
   }
 }

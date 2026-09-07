@@ -19,7 +19,7 @@ export function caseWhisper(s: WhisperState): string {
     if (s.locationId === "drive" && !flag("gardenOpen")) {
       return "The boy stays at the rim of the frame. Walk to him. E to hear him.";
     }
-    if (s.locationId === "drive") return "The rose garden is at the end of the drive.";
+    if (s.locationId === "drive") return "Keep walking the gravel. The garden gate is at the far end.";
     if (s.locationId === "garden") {
       if (!has("wexford") && !has("no-exit") && !has("unknown")) {
         return "Six men in evening dress. Kneel. Look at the hole that has no answer.";

@@ -265,6 +265,8 @@ function PlayHud() {
     spine,
     filedEight,
   });
+  const nearby = useGame((s) => s.nearby);
+  const focusId = useGame((s) => s.focusId);
   if (overlay) return null;
   return (
     <div className="hud" style={{ fontSize: `${scale}rem` }}>
@@ -275,6 +277,20 @@ function PlayHud() {
             {chapter === 1 ? ` · ${coat === "uniform" ? "Badge" : "Plain coat"}` : ""}
           </p>
           <p className="whisper">{whisper}</p>
+          {nearby.length > 0 && (
+            <nav className="subjects" aria-label="Nearby">
+              {nearby.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  className={n.id === focusId ? "subject is-focus" : "subject"}
+                  onClick={() => input.use(n.id)}
+                >
+                  {n.label}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
         <button
           type="button"
@@ -286,10 +302,10 @@ function PlayHud() {
       </div>
       <div className="crosshair" aria-hidden />
       {prompt && (
-        <div className="prompt">
-          <span>E</span>
+        <button type="button" className="prompt" onClick={() => input.use()}>
+          <span>Examine</span>
           <strong>{prompt}</strong>
-        </div>
+        </button>
       )}
       <p className="hud-hint">
         {hint ? "Click and drag to look. " : ""}
@@ -327,7 +343,7 @@ function CardModal() {
   return (
     <button type="button" className="intertitle" onClick={advance} style={{ fontSize: `${scale}em` }}>
       <p className="card-text">{line?.text}</p>
-      <span className="fine">{overlay.index + 1} / {overlay.lines.length}</span>
+      <span className="fine">Continue · {overlay.index + 1} / {overlay.lines.length}</span>
     </button>
   );
 }

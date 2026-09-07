@@ -4,7 +4,7 @@ A three-chapter silver-nitrate investigation. Widow's Bight, 1923–1940s.
 
 WASD to walk, click-drag to look, **E** to examine. The badge opens doors. The wool opens mouths.
 
-Pointer lock is cosmetic (it hides the cursor). Walking is applied from WASD relative to the current look direction whether or not the lock request succeeds — the live preview often cannot lock the pointer, and movement still works.
+Pointer lock is not used. Walking is applied from WASD relative to the current look direction. Click the world once so the game can receive keys, then WASD.
 
 ## Controls
 
@@ -30,7 +30,11 @@ For a path that never depends on DOM keyboard events, drive the same internal ac
 ```js
 window.__gameInput.move(0, 1, 800)   // forward 800ms; x = strafe, y = forward (−1…1)
 window.__gameInput.look(40, 0)       // look delta, same units as pointer movement
-window.__gameInput.interact()        // E
+window.__gameInput.interact()        // examine whatever is focused
+window.__gameInput.use("boy")        // walk to a subject if needed, then examine
+window.__gameInput.walkTo("boy")     // same; pass { use: false } to only arrive
+window.__gameInput.lookAt("boy")     // face a subject
+window.__gameInput.getWorld()        // location, pose, overlay, nearby subjects
 window.__gameInput.openFile()        // Tab
 window.__gameInput.openInventory()   // I
 window.__gameInput.flask()           // F
@@ -43,7 +47,11 @@ window.__gameInput.setKeys(["KeyW"]) // hold until the next setKeys / clear
 window.__gameInput.clear()
 ```
 
-`__gameInput` is installed as soon as the game module loads. Movement and look apply while the world is on screen (`play`). One-shot methods (`interact`, `openFile`, …) pulse the same flags the real keys set, so they fire on the next animation frame.
+`__gameInput` is installed as soon as the game module loads (`window.__game` is the same object). Movement and look apply while the world is on screen (`play`). `use(id)` / `walkTo(id)` drive the player through the 3D set and fire the same examine path as **E**.
+
+Once the 3D world is up, nearby names also appear as real buttons (and the centered prompt is a button). Click a name to walk over and examine it — no pointer lock required. A click on the canvas that is not a drag also examines whatever is focused.
+
+One-shot methods (`openFile`, `flask`, …) pulse the same flags the real keys set, so they fire on the next animation frame.
 
 The existing pose probe remains for control QA:
 

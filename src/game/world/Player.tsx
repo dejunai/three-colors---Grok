@@ -1,8 +1,10 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { actOn } from "../act";
 import { input } from "../input";
 import { LOCATION } from "../content";
+import { seek } from "../seek";
 import type { Interactable, LocationDef, Wall } from "../types";
 import { useGame } from "../store";
 import { audio } from "../audio";
@@ -25,14 +27,6 @@ function blocked(x: number, z: number, walls: Wall[] | undefined, b: LocationDef
   return false;
 }
 
-function embeddedFrame() {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
-}
-
 export function Player({ location, onFocus, onUse }: Props) {
   const { camera, gl } = useThree();
   const yaw = useRef(location.yaw ?? 0);
@@ -44,7 +38,8 @@ export function Player({ location, onFocus, onUse }: Props) {
   const jumpV = useRef(0);
   const grounded = useRef(true);
   const locId = useRef(location.id);
-  const lockDenied = useRef(embeddedFrame());
+  const nearKey = useRef("");
+  const click = useRef({ x: 0, y: 0, t: 0 });
 
   const heard = useGame((s) => s.heardShatter);
   const chapter = useGame((s) => s.chapter);
@@ -59,42 +54,34 @@ export function Player({ location, onFocus, onUse }: Props) {
   }, [location.id, location.spawn, location.yaw, camera]);
 
   useEffect(() => {
+    input.bind();
     const el = gl.domElement;
     el.tabIndex = 0;
     el.style.outline = "none";
-
-    const deny = () => {
-      lockDenied.current = true;
-    };
-    document.addEventListener("pointerlockerror", deny);
+    input.attachTarget(el);
 
     const down = (e: PointerEvent) => {
       if (useGame.getState().overlay) return;
       if (e.button !== 0) return;
       input.pointerDown = true;
+      click.current = { x: e.clientX, y: e.clientY, t: performance.now() };
       useGame.setState({ lookHint: false });
       el.focus({ preventScroll: true });
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        /* capture is optional */
-      }
-      // Pointer lock only hides the cursor. WASD / drag-look never depend on it.
-      if (lockDenied.current || document.pointerLockElement === el) return;
-      input.ignoreNextBlur();
-      try {
-        const req = el.requestPointerLock?.();
-        if (req && typeof (req as Promise<void>).then === "function") {
-          void (req as Promise<void>).catch(deny);
-        }
-      } catch {
-        deny();
+    };
+    const up = (e: PointerEvent) => {
+      const d = Math.hypot(e.clientX - click.current.x, e.clientY - click.current.y);
+      const dt = performance.now() - click.current.t;
+      input.pointerDown = false;
+      if (d < 8 && dt < 450 && !useGame.getState().overlay) {
+        input.use();
       }
     };
     el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
     return () => {
       el.removeEventListener("pointerdown", down);
-      document.removeEventListener("pointerlockerror", deny);
+      el.removeEventListener("pointerup", up);
+      input.attachTarget(null);
     };
   }, [gl]);
 
@@ -133,8 +120,27 @@ export function Player({ location, onFocus, onUse }: Props) {
       const rx = Math.cos(heading);
       const rz = -Math.sin(heading);
 
-      const wishX = fx * now.moveY + rx * now.moveX;
-      const wishZ = fz * now.moveY + rz * now.moveX;
+      let wishX = fx * now.moveY + rx * now.moveX;
+      let wishZ = fz * now.moveY + rz * now.moveX;
+
+      const target = seek.get();
+      if (target) {
+        const dx = target.x - pos.current.x;
+        const dz = target.z - pos.current.z;
+        const dist = Math.hypot(dx, dz);
+        const it = target.id ? location.interactables.find((i) => i.id === target.id) : undefined;
+        const stopAt = it ? Math.max(1.05, (it.radius ?? 2.2) * 0.55) : 1.2;
+        if (dist <= stopAt) {
+          seek.clear();
+          wishX = 0;
+          wishZ = 0;
+          if (target.use && it) actOn(it);
+        } else {
+          wishX = dx / dist;
+          wishZ = dz / dist;
+          yaw.current = Math.atan2(-dx, -dz);
+        }
+      }
       const sprint = now.crouch ? 1.45 : 3.15;
       const mag = Math.hypot(wishX, wishZ);
       speedRef.current = mag * sprint;
@@ -193,11 +199,13 @@ export function Player({ location, onFocus, onUse }: Props) {
     let nearestDist = Infinity;
     let looked: Interactable | null = null;
     let lookedDot = 0.22;
+    const listed: { id: string; label: string; dist: number }[] = [];
     for (const it of location.interactables) {
       if (it.hideIfExamined && st.examined[it.id]) continue;
       if (it.requireFlag && !st.flags[it.requireFlag]) continue;
       tmp.set(it.pos[0], it.pos[1], it.pos[2]).sub(pos.current);
       const dist = tmp.length();
+      listed.push({ id: it.id, label: it.label, dist });
       const reach = (it.radius ?? 2.2) + 1.15;
       if (dist > reach) continue;
       if (dist < nearestDist) {
@@ -211,9 +219,18 @@ export function Player({ location, onFocus, onUse }: Props) {
         looked = it;
       }
     }
+    listed.sort((a, b) => a.dist - b.dist);
     const best = looked ?? nearest;
     onFocus(best);
-    if (!freeze && just.interact && best) onUse(best);
+    const key = listed.map((n) => n.id).join("|") + ">" + (best?.id ?? "");
+    if (key !== nearKey.current) {
+      nearKey.current = key;
+      st.setNearby(
+        listed.map(({ id, label }) => ({ id, label })),
+        best?.id ?? null,
+      );
+    }
+    if (!freeze && just.interact && best) actOn(best);
     if (!freeze && just.flask) {
       if (st.chapter === 1) st.drinkFlask();
       if (st.chapter === 2) st.drinkOpium();
