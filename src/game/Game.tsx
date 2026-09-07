@@ -42,8 +42,8 @@ export function Game() {
       className="game-root"
       data-screen={screen}
       style={{
-        ["--sat" as string]: String(0.22 + amount * 0.75),
-        ["--con" as string]: String(1.05 + amount * 0.08),
+        ["--con" as string]: String(1.16 + amount * 0.18),
+        ["--bright" as string]: String(1.1 - amount * 0.08),
       }}
     >
       {showWorld && World ? <World /> : <div className="world-placeholder" />}
