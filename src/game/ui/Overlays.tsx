@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ACHIEVEMENTS, CHAPTER_META, CLUES, LOCATION, PROLOGUE, TITLE } from "../content";
+import { caseWhisper } from "../hints";
 import { hasSave, useGame } from "../store";
-import { input } from "../input";
+import { input, resolveKeyCode } from "../input";
 
 function FilmGrain({ reduce }: { reduce: boolean }) {
   return <div className={reduce ? "grain grain-still" : "grain"} aria-hidden />;
@@ -248,14 +249,33 @@ function PlayHud() {
   const coat = useGame((s) => s.coat);
   const scale = useGame((s) => s.a11y.subtitleScale);
   const hint = useGame((s) => s.lookHint);
+  const flags = useGame((s) => s.flags);
+  const clues = useGame((s) => s.clues);
+  const inventory = useGame((s) => s.inventory);
+  const spine = useGame((s) => s.spine);
+  const filedEight = useGame((s) => s.filedEight);
+  const locationId = useGame((s) => s.locationId);
+  const whisper = caseWhisper({
+    chapter,
+    locationId,
+    flags,
+    clues,
+    coat,
+    inventory,
+    spine,
+    filedEight,
+  });
   if (overlay) return null;
   return (
     <div className="hud" style={{ fontSize: `${scale}rem` }}>
       <div className="hud-top">
-        <p className="kicker">
-          {loc?.name}
-          {chapter === 1 ? ` · ${coat === "uniform" ? "Badge" : "Plain coat"}` : ""}
-        </p>
+        <div className="hud-meta">
+          <p className="kicker">
+            {loc?.name}
+            {chapter === 1 ? ` · ${coat === "uniform" ? "Badge" : "Plain coat"}` : ""}
+          </p>
+          <p className="whisper">{whisper}</p>
+        </div>
         <button
           type="button"
           className="hud-pause"
@@ -339,6 +359,7 @@ function FileModal() {
   const decay = useGame((s) => s.decay);
   const protect = useGame((s) => s.a11y.protectClues);
   const eight = useGame((s) => s.filedEight);
+  const chapter = useGame((s) => s.chapter);
   if (!overlay || overlay.kind !== "file") return null;
   const rows = Object.keys(clues)
     .map((id) => CLUES[id])
@@ -346,8 +367,8 @@ function FileModal() {
   return (
     <div className="modal-back" onClick={close} role="presentation">
       <article className="file-sheet" onClick={(e) => e.stopPropagation()}>
-        <p className="kicker ink">Case file · Corwin</p>
-        <h3 className="display ink">No Exit Wound</h3>
+        <p className="kicker ink">{chapter === 1 ? "Case file · Corwin" : chapter === 2 ? "Field Codex · Kohistani" : "File · Freeman"}</p>
+        <h3 className="display ink">{chapter === 1 ? "No Exit Wound" : chapter === 2 ? "Total Recovery" : "Scorched Earth"}</h3>
         <p className="body-copy">
           {eight ? "Eight people are dead." : "Six members are dead."} Presentation may drift. Facts do not.
         </p>
@@ -679,18 +700,19 @@ export function Overlays() {
     };
     const onKey = (e: KeyboardEvent) => {
       const st = useGame.getState();
-      if (e.code === "Escape" && st.overlay) {
+      const code = resolveKeyCode(e);
+      if (code === "Escape" && st.overlay) {
         e.preventDefault();
         st.closeOverlay();
         return;
       }
-      if (e.code === "Escape" && st.screen === "pause") {
+      if (code === "Escape" && st.screen === "pause") {
         e.preventDefault();
         st.setScreen("play");
         return;
       }
       if (!st.overlay) return;
-      if (e.code !== "Space" && e.code !== "KeyE" && e.code !== "Enter") return;
+      if (code !== "Space" && code !== "KeyE" && code !== "Enter") return;
       e.preventDefault();
       if (st.overlay.kind === "card") st.advanceCard();
       else if (st.overlay.kind === "examine" || st.overlay.kind === "file" || st.overlay.kind === "inventory" || st.overlay.kind === "board") {

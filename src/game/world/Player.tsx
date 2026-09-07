@@ -156,22 +156,29 @@ export function Player({ location, onFocus, onUse }: Props) {
     camera.rotation.x = pitch.current;
 
     camera.getWorldDirection(fwd);
-    let best: Interactable | null = null;
-    let bestScore = 0.62;
+    let nearest: Interactable | null = null;
+    let nearestDist = Infinity;
+    let looked: Interactable | null = null;
+    let lookedDot = 0.22;
     for (const it of location.interactables) {
       if (it.hideIfExamined && st.examined[it.id]) continue;
       if (it.requireFlag && !st.flags[it.requireFlag]) continue;
       tmp.set(it.pos[0], it.pos[1], it.pos[2]).sub(pos.current);
       const dist = tmp.length();
-      const reach = (it.radius ?? 1.8) + 0.7;
+      const reach = (it.radius ?? 2.2) + 1.15;
       if (dist > reach) continue;
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = it;
+      }
       tmp.normalize();
       const dot = fwd.dot(tmp);
-      if (dot > bestScore) {
-        bestScore = dot;
-        best = it;
+      if (dot > lookedDot) {
+        lookedDot = dot;
+        looked = it;
       }
     }
+    const best = looked ?? nearest;
     onFocus(best);
     if (!freeze && just.interact && best) onUse(best);
     if (!freeze && just.flask) {

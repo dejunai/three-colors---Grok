@@ -178,7 +178,7 @@ export const LOCATIONS: LocationDef[] = [
         pos: [3.2, 1.2, 8],
         label: "Gatehouse boy",
         kind: "person",
-        radius: 2.4,
+        radius: 3.6,
         options: [
           {
             id: "ask",
@@ -200,7 +200,7 @@ export const LOCATIONS: LocationDef[] = [
         kind: "exit",
         exitTo: "garden",
         requireFlag: "gardenOpen",
-        radius: 2.8,
+        radius: 3.8,
       },
       {
         id: "lantern-post",
@@ -333,7 +333,7 @@ export const LOCATIONS: LocationDef[] = [
         pos: [2.4, 1.1, 8.5],
         label: "Captain Odell",
         kind: "person",
-        radius: 2.2,
+        radius: 3.0,
         options: [
           {
             id: "report",
@@ -371,7 +371,7 @@ export const LOCATIONS: LocationDef[] = [
         label: "Leave for town",
         kind: "exit",
         exitTo: "street",
-        radius: 2.2,
+        radius: 3.2,
       },
     ],
   },
@@ -492,7 +492,7 @@ export const LOCATIONS: LocationDef[] = [
         pos: [14, 1.1, 1],
         label: "A quarryman",
         kind: "person",
-        radius: 2,
+        radius: 2.4,
         options: [
           {
             id: "look",
@@ -504,6 +504,27 @@ export const LOCATIONS: LocationDef[] = [
               ],
               perception: 4,
               flag: "observer1",
+            },
+          },
+        ],
+      },
+      {
+        id: "tailor",
+        pos: [8, 1.1, 2],
+        label: "The tailor",
+        kind: "person",
+        radius: 2.4,
+        options: [
+          {
+            id: "sixth",
+            label: "Ask who cut the sixth jacket",
+            result: {
+              lines: [
+                { text: "HE CUT THE OTHER FIVE. HE WILL SWEAR IT. THE SIXTH MAN'S CLOTH HE NEVER TOUCHED, AND THE CLUB'S OWN ROLLS DO NOT CONTAIN A SIXTH NAME TO LOSE." },
+              ],
+              clueId: "unknown",
+              perception: 5,
+              flag: "tailor",
             },
           },
         ],
@@ -1180,7 +1201,7 @@ export const LOCATIONS: LocationDef[] = [
     id: "galleries",
     chapter: 2,
     name: "The galleries",
-    set: "island",
+    set: "cavern",
     spawn: [0, 1.7, 8],
     fog: "#101214",
     fogNear: 4,
@@ -1221,6 +1242,17 @@ export const LOCATIONS: LocationDef[] = [
         perception: 6,
         flag: "walterTrace",
         radius: 1.6,
+      },
+      {
+        id: "field-book",
+        pos: [-3.2, 0.4, -6],
+        label: "A field notebook",
+        kind: "examine",
+        title: "Total recovery",
+        body: "You wrote it in the front of every notebook. A find described and left where the ground kept it proves more than a find carried into a private cabinet. The next page is wet. The page after that is not in your hand.",
+        perception: 5,
+        flag: "codexRule",
+        radius: 1.7,
       },
       {
         id: "to-maw",
@@ -1362,6 +1394,27 @@ export const LOCATIONS: LocationDef[] = [
         perception: 8,
         flag: "ophionRead",
         radius: 1.8,
+      },
+      {
+        id: "denier",
+        pos: [-8, 1.1, 2],
+        label: "A man who was never here",
+        kind: "person",
+        radius: 2.4,
+        options: [
+          {
+            id: "ask",
+            label: "Ask who paid the lay",
+            result: {
+              lines: [
+                { text: "THERE IS NO COURT IN THIS COUNTY THAT OPENS THAT BOOK AGAIN." },
+                { text: "HE SAYS THIS THE WAY A MAN SAYS THE TIDE. NOT AS A THREAT. AS WEATHER." },
+              ],
+              perception: 4,
+              flag: "denied",
+            },
+          },
+        ],
       },
       {
         id: "to-cavern",
