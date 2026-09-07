@@ -25,6 +25,14 @@ function blocked(x: number, z: number, walls: Wall[] | undefined, b: LocationDef
   return false;
 }
 
+function embeddedFrame() {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 export function Player({ location, onFocus, onUse }: Props) {
   const { camera, gl } = useThree();
   const yaw = useRef(location.yaw ?? 0);
@@ -36,6 +44,7 @@ export function Player({ location, onFocus, onUse }: Props) {
   const jumpV = useRef(0);
   const grounded = useRef(true);
   const locId = useRef(location.id);
+  const lockDenied = useRef(embeddedFrame());
 
   const heard = useGame((s) => s.heardShatter);
   const chapter = useGame((s) => s.chapter);
@@ -51,20 +60,42 @@ export function Player({ location, onFocus, onUse }: Props) {
 
   useEffect(() => {
     const el = gl.domElement;
+    el.tabIndex = 0;
+    el.style.outline = "none";
+
+    const deny = () => {
+      lockDenied.current = true;
+    };
+    document.addEventListener("pointerlockerror", deny);
+
     const down = (e: PointerEvent) => {
       if (useGame.getState().overlay) return;
       if (e.button !== 0) return;
       input.pointerDown = true;
       useGame.setState({ lookHint: false });
-      el.setPointerCapture(e.pointerId);
+      el.focus({ preventScroll: true });
       try {
-        el.requestPointerLock?.();
+        el.setPointerCapture(e.pointerId);
       } catch {
-        /* iframe may refuse */
+        /* capture is optional */
+      }
+      // Pointer lock only hides the cursor. WASD / drag-look never depend on it.
+      if (lockDenied.current || document.pointerLockElement === el) return;
+      input.ignoreNextBlur();
+      try {
+        const req = el.requestPointerLock?.();
+        if (req && typeof (req as Promise<void>).then === "function") {
+          void (req as Promise<void>).catch(deny);
+        }
+      } catch {
+        deny();
       }
     };
     el.addEventListener("pointerdown", down);
-    return () => el.removeEventListener("pointerdown", down);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      document.removeEventListener("pointerlockerror", deny);
+    };
   }, [gl]);
 
   useEffect(() => {
@@ -95,10 +126,12 @@ export function Player({ location, onFocus, onUse }: Props) {
       yaw.current -= now.lookX * 0.0024;
       pitch.current = Math.max(-1.25, Math.min(1.2, pitch.current - now.lookY * 0.002));
 
-      const fx = -Math.sin(yaw.current);
-      const fz = -Math.cos(yaw.current);
-      const rx = Math.cos(yaw.current);
-      const rz = -Math.sin(yaw.current);
+      // Walk relative to current look (drag or lock — lock is never a gate).
+      const heading = yaw.current;
+      const fx = -Math.sin(heading);
+      const fz = -Math.cos(heading);
+      const rx = Math.cos(heading);
+      const rz = -Math.sin(heading);
 
       const wishX = fx * now.moveY + rx * now.moveX;
       const wishZ = fz * now.moveY + rz * now.moveX;

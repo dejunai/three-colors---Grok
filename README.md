@@ -4,6 +4,8 @@ A three-chapter silver-nitrate investigation. Widow's Bight, 1923–1940s.
 
 WASD to walk, click-drag to look, **E** to examine. The badge opens doors. The wool opens mouths.
 
+Pointer lock is cosmetic (it hides the cursor). Walking is applied from WASD relative to the current look direction whether or not the lock request succeeds — the live preview often cannot lock the pointer, and movement still works.
+
 ## Controls
 
 | Key | Action |

@@ -41,6 +41,10 @@ export function Game() {
     <div
       className="game-root"
       data-screen={screen}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        (e.currentTarget as HTMLDivElement).focus({ preventScroll: true });
+      }}
       style={{
         ["--con" as string]: String(1.16 + amount * 0.18),
         ["--bright" as string]: String(1.1 - amount * 0.08),

@@ -113,6 +113,8 @@ export type GameInputHook = {
   clear: () => void;
 };
 
+const listenOpts: AddEventListenerOptions = { capture: true };
+
 class Input {
   keys = new Set<string>();
   injected = new Set<string>();
@@ -127,33 +129,37 @@ class Input {
   private edges: Actions = empty();
   private bound = false;
   pointerDown = false;
+  /** Failed pointer-lock (iframe / WrongDocumentError) must not wipe held WASD. */
+  private suppressBlurClear = false;
   private moveTimer: ReturnType<typeof setTimeout> | null = null;
 
   bind() {
     if (this.bound) return;
     this.bound = true;
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    window.addEventListener("blur", this.clear);
+    window.addEventListener("keydown", this.onKeyDown, listenOpts);
+    window.addEventListener("keyup", this.onKeyUp, listenOpts);
+    window.addEventListener("blur", this.onBlur);
     document.addEventListener("visibilitychange", this.onVis);
     window.addEventListener("pointermove", this.onMove);
     window.addEventListener("pointerup", this.onUp);
     window.addEventListener("pointercancel", this.onUp);
     window.addEventListener("contextmenu", this.onMenu);
+    document.addEventListener("pointerlockerror", this.onLockError);
     this.installHook();
   }
 
   unbind() {
     if (!this.bound) return;
     this.bound = false;
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    window.removeEventListener("blur", this.clear);
+    window.removeEventListener("keydown", this.onKeyDown, listenOpts);
+    window.removeEventListener("keyup", this.onKeyUp, listenOpts);
+    window.removeEventListener("blur", this.onBlur);
     document.removeEventListener("visibilitychange", this.onVis);
     window.removeEventListener("pointermove", this.onMove);
     window.removeEventListener("pointerup", this.onUp);
     window.removeEventListener("pointercancel", this.onUp);
     window.removeEventListener("contextmenu", this.onMenu);
+    document.removeEventListener("pointerlockerror", this.onLockError);
     this.clear();
   }
 
@@ -197,10 +203,18 @@ class Input {
     }, Math.max(0, ms));
   }
 
+  /** Next window blur (failed pointer lock) must not drop held movement keys. */
+  ignoreNextBlur() {
+    this.suppressBlurClear = true;
+  }
+
   private onMenu = (e: Event) => e.preventDefault();
 
+  private onLockError = () => {
+    this.suppressBlurClear = true;
+  };
+
   private onKeyDown = (e: KeyboardEvent) => {
-    if (e.repeat) return;
     const code = resolveKeyCode(e);
     if (!code) return;
     e.preventDefault();
@@ -217,8 +231,18 @@ class Input {
     if (document.hidden) this.clear();
   };
 
+  private onBlur = () => {
+    if (this.suppressBlurClear) {
+      this.suppressBlurClear = false;
+      this.pointerDown = false;
+      return;
+    }
+    this.clear();
+  };
+
   private onMove = (e: PointerEvent) => {
-    if (!this.pointerDown) return;
+    const locked = Boolean(document.pointerLockElement);
+    if (!locked && !this.pointerDown) return;
     this.lookX += e.movementX;
     this.lookY += e.movementY;
   };
