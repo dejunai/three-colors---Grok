@@ -96,13 +96,12 @@
   width: 100% !important;
   height: 100% !important;
   display: block;
-  filter: saturate(var(--sat, 0.35)) contrast(var(--con, 1.06));
 }
 
 .world-placeholder {
   position: absolute;
   inset: 0;
-  background: #0a0908;
+  background: #6a6a68;
 }
 
 .ui-root {
@@ -345,8 +344,29 @@
   padding: var(--space-5);
 }
 
+.hud-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
 .hud-top .kicker {
   text-shadow: 0 1px 8px #000;
+}
+
+.hud-pause {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in oklab, var(--color-bone) 28%, transparent);
+  background: rgb(10 9 8 / 0.55);
+  color: var(--color-bone);
+  font-family: var(--font-card);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm);
 }
 
 .prompt {
@@ -554,15 +574,21 @@
   position: absolute;
   inset: 0;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
+  box-shadow: inset 0 0 110px 18px rgb(0 0 0 / 0.28);
+}
+
+.iris-layer[data-kind="square"] {
+  box-shadow: inset 0 0 90px 12px rgb(0 0 0 / 0.22);
+}
+
+.iris-layer[data-kind="burn"] {
+  background: radial-gradient(ellipse at center, transparent 52%, rgb(0 0 0 / 0.42) 100%);
+  box-shadow: inset 0 0 140px 24px rgb(0 0 0 / 0.32);
 }
 
 .iris-hole {
-  box-shadow: 0 0 0 200vmax #000;
-  background: transparent;
+  display: none;
 }
 
 .grain {
@@ -570,7 +596,7 @@
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0.12;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
   animation: grain 0.8s steps(2) infinite;
@@ -595,7 +621,7 @@
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  box-shadow: inset 0 0 120px #000a;
+  box-shadow: inset 0 0 90px rgb(0 0 0 / 0.18);
 }
 
 .is-glitch {

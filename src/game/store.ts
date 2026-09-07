@@ -59,6 +59,7 @@ type GameStore = {
   setMuted: (m: boolean) => void;
   newGame: (chapter: ChapterId) => void;
   continueGame: () => void;
+  wipeSave: () => void;
   setLocation: (id: string) => void;
   examine: (id: string, title: string, body: string, opts?: { clueId?: string; perception?: number; item?: ItemId; flag?: string }) => void;
   closeOverlay: () => void;
@@ -190,7 +191,7 @@ export const useGame = create<GameStore>((set, get) => ({
   fuel: 8,
   combat: 6,
   decay: 0.05,
-  iris: 0.38,
+  iris: 0.72,
   examined: {},
   clues: {},
   inventory: startInv(1),
@@ -254,7 +255,7 @@ export const useGame = create<GameStore>((set, get) => ({
       fuel: chapter === 1 ? 8 : 10,
       combat: chapter === 3 ? 7 : 2,
       decay: 0.04,
-      iris: chapter === 1 ? 0.38 : 0.92,
+      iris: chapter === 1 ? 0.72 : 0.95,
       examined: {},
       clues: {},
       inventory: startInv(chapter),
@@ -270,6 +271,44 @@ export const useGame = create<GameStore>((set, get) => ({
       locked: false,
     });
     get().persist();
+  },
+  wipeSave: () => {
+    clearSave();
+    set({
+      screen: "title",
+      chapter: 1,
+      locationId: "drive",
+      overlay: null,
+      prompt: null,
+      coat: "uniform",
+      flask: 5,
+      flaskSpilled: false,
+      ammo: 6,
+      spare: 6,
+      matches: 12,
+      opium: 4,
+      strength: 3,
+      fuel: 8,
+      combat: 6,
+      decay: 0.04,
+      iris: 0.72,
+      examined: {},
+      clues: {},
+      inventory: startInv(1),
+      flags: {},
+      pack: [],
+      codex: [],
+      filedEight: false,
+      triplicate: false,
+      spine: false,
+      heardShatter: false,
+      finalAct: null,
+      wageClaim: false,
+      chaptersDone: [],
+      achievements: {},
+      locked: false,
+      glitch: 0,
+    });
   },
   continueGame: () => {
     const d = readSave();
