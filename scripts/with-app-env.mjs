@@ -104,6 +104,48 @@ export function isMainModule(moduleUrl) {
   }
 }
 
+/**
+ * Quote a single argument per the CreateProcess/CommandLineToArgvW rules, so
+ * a Windows `shell: true` command line round-trips through cmd.exe intact.
+ */
+export function quoteWindowsArg(arg) {
+  if (arg.length === 0) return '""';
+  if (!/[ \t\n\v"]/.test(arg)) return arg;
+  let result = '"';
+  for (let i = 0; i < arg.length; ) {
+    let backslashes = 0;
+    while (arg[i] === "\\") {
+      backslashes++;
+      i++;
+    }
+    if (i === arg.length) {
+      result += "\\".repeat(backslashes * 2);
+    } else if (arg[i] === '"') {
+      result += "\\".repeat(backslashes * 2 + 1) + '"';
+      i++;
+    } else {
+      result += "\\".repeat(backslashes) + arg[i];
+      i++;
+    }
+  }
+  return result + '"';
+}
+
+/**
+ * Windows `spawn` can't resolve a bare `node_modules/.bin` shim (`vite` has
+ * no `.exe`, only `.cmd`/`.ps1`) without going through a shell. `shell: true`
+ * with a separate `args` array is deprecated (DEP0190, unescaped args), so on
+ * win32 we fold everything into one pre-quoted command line instead.
+ */
+function buildSpawnInvocation(command, args) {
+  if (process.platform !== "win32") return { command, args, shell: false };
+  return {
+    command: [command, ...args].map(quoteWindowsArg).join(" "),
+    args: [],
+    shell: true,
+  };
+}
+
 function main(argv) {
   const [command, ...args] = argv;
   if (!command) {
@@ -111,7 +153,12 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
-  const child = spawn(command, args, { stdio: "inherit", env });
+  const invocation = buildSpawnInvocation(command, args);
+  const child = spawn(invocation.command, invocation.args, {
+    stdio: "inherit",
+    env,
+    shell: invocation.shell,
+  });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.on(signal, () => child.kill(signal));
